@@ -2,12 +2,23 @@
 
 @implementation VKContactPhotoProvider
   - (DDNotificationContactPhotoPromiseOffer *)contactPhotoPromiseOfferForNotification:(DDUserNotification *)notification {
-    NSString *from_id = [notification.applicationUserInfo valueForKeyPath:@"data.from_id"];
-    if (!from_id) return nil;
+    NSString *from_id = [NSString stringWithFormat:@"%@", [notification applicationUserInfo][@"data"][@"from_id"]];
+    NSString *profile_url = [NSString stringWithFormat:@"https://m.vk.com/id%@", from_id];
+    NSURL *url = [NSURL URLWithString:profile_url];
 
-    NSString *imageURLStr = [NSString stringWithFormat:@"https://shortlook-vk.herokuapp.com/profile-picture/%@", from_id];
-    NSURL *imageURL = [NSURL URLWithString:imageURLStr];
+    NSError *error = nil;
+    NSString *html = [NSString stringWithContentsOfURL:url encoding: NSUTF8StringEncoding error:&error];
 
-    return [NSClassFromString(@"DDNotificationContactPhotoPromiseOffer") offerDownloadingPromiseWithPhotoIdentifier:imageURLStr fromURL:imageURL];
+    if (error == nil) {
+      NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"<div .+profile_panel.+\\s.+<img src=\"(.+)\" class" options:0 error:&error];
+      NSTextCheckingResult *result = [regex firstMatchInString:html options:0 range:NSMakeRange(0, html.length)];
+
+      if (error == nil){
+        NSString *imageURLStr = [html substringWithRange: [result rangeAtIndex:1]];
+        NSURL *imageURL = [NSURL URLWithString:imageURLStr];
+        return [NSClassFromString(@"DDNotificationContactPhotoPromiseOffer") offerDownloadingPromiseWithPhotoIdentifier:imageURLStr fromURL:imageURL];
+      }
+    }
+    return nil;
   }
 @end
